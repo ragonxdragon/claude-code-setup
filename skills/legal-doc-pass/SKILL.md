@@ -48,6 +48,6 @@ The legal text must describe data handling exactly as the product does it, every
 
 ## Hard rules
 
-- Never delete a legal document or a clause because it "seems unused"; flag it for the owner.
-- Jurisdiction, arbitration, and liability-cap choices are OWNER DECISIONS. Mark them `DECISION-NEEDED` with the options; never pick one silently.
+- Never delete a legal document or a clause because it "seems unused"; flag it for the user.
+- Jurisdiction, arbitration, and liability-cap choices are decisions for the user. Mark them `DECISION-NEEDED` with the options; never pick one silently.
 - Use ASCII punctuation in edits (many repositories' hooks reject curly quotes and em dashes).

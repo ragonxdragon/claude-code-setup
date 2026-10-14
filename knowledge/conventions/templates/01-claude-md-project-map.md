@@ -41,7 +41,7 @@ Rule: a project CLAUDE.md is a MAP plus hard rules, 25 to 40 lines, and nothing 
    facts you have retyped more than once}
 
 ## Escalation
-- {When to stop and ask; which decisions belong to the owner}
+- {When to stop and ask; which decisions are yours alone}
 ```
 
 ## Filled example (fictional)
