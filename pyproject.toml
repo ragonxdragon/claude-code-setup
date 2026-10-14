@@ -1,0 +1,8 @@
+# Tool configuration only. This repository is not an installable package; the
+# hooks and scripts are standalone, standard-library-only Python 3.10+ files.
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "BLE"]

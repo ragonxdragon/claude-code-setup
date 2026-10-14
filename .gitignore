@@ -1,0 +1,30 @@
+# Secrets and machine-local grants: never commit these when ~/.claude is a repo
+.credentials.json
+settings.json
+settings.local.json
+.mcp.json
+mcp*.json
+
+# Runtime state, transcripts, caches (Claude Code manages these)
+projects/
+sessions/
+session-env/
+shell-snapshots/
+file-history/
+paste-cache/
+telemetry/
+plugins/
+todos/
+statsig/
+ide/
+cache/
+backups/
+downloads/
+history.jsonl
+
+# Generated output
+artifacts/
+knowledge_graph.html
+__pycache__/
+*.pyc
+.ruff_cache/
