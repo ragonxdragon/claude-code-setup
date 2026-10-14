@@ -45,12 +45,6 @@ import sys
 
 from hookutil import block, read_payload, shell_command, strip_quoted_strings
 
-FORCE_PUSH = re.compile(
-    r"git\s+push\b.*(--force(-with-lease)?\b|(?<!\w)-f(?!\w))",
-    re.IGNORECASE,
-)
-MAIN_BRANCH_REF = re.compile(r"\b(origin[/\s]+)?(main|master)\b", re.IGNORECASE)
-
 # Matches an explicit `origin` remote or a GitHub URL on a `git push`. Unlike a
 # git pre-push hook, `--no-verify` cannot skip this check.
 ORIGIN_PUSH = re.compile(
@@ -58,10 +52,77 @@ ORIGIN_PUSH = re.compile(
     re.IGNORECASE,
 )
 
-BRANCH_DELETE_MAIN = re.compile(
-    r"git\s+(branch\s+(-D|-d\s+-f|--delete\s+--force)|push\s+\S+\s+--delete)\s+.*\b(main|master)\b",
-    re.IGNORECASE,
-)
+PROTECTED_BRANCHES = {"main", "master"}
+SEGMENT_SPLIT = re.compile(r"&&|\|\||[;|\n]")
+
+
+def is_protected_ref(ref: str) -> bool:
+    """True when ref names main or master itself (main, refs/heads/main,
+    origin/main, remotes/origin/main). A branch that only contains the word,
+    such as fix/main-diag-stall, is not protected."""
+    ref = ref.strip().lstrip("+")
+    for prefix in ("refs/heads/", "refs/remotes/origin/", "remotes/origin/", "origin/"):
+        if ref.lower().startswith(prefix):
+            ref = ref[len(prefix) :]
+    return ref.lower() in PROTECTED_BRANCHES
+
+
+def git_args(segment: str) -> list[str] | None:
+    """The arguments after `git` in one command segment, skipping env prefixes
+    and git's own options (-C dir, -c key=val), or None if it is not a git call."""
+    tokens = segment.split()
+    while tokens and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", tokens[0]):
+        tokens = tokens[1:]
+    if not tokens or not re.search(r"(^|[\\/])git(\.exe)?$", tokens[0]):
+        return None
+    args = tokens[1:]
+    while args and args[0] in ("-C", "-c", "--git-dir", "--work-tree"):
+        args = args[2:]
+    return args
+
+
+def deletes_protected_branch(check: str) -> bool:
+    """git branch -d/-D/--delete, or git push --delete / :ref, naming main or master."""
+    for segment in SEGMENT_SPLIT.split(check):
+        args = git_args(segment)
+        if not args:
+            continue
+        if args[0] == "branch" and any(a in ("-d", "-D", "--delete") for a in args[1:]):
+            if any(is_protected_ref(a) for a in args[1:] if not a.startswith("-")):
+                return True
+        if args[0] == "push":
+            rest = [a for a in args[1:] if not a.startswith("-")]
+            deleting = any(a in ("-d", "--delete") for a in args[1:])
+            for spec in rest[1:]:
+                if deleting and is_protected_ref(spec):
+                    return True
+                if spec.startswith(":") and is_protected_ref(spec[1:]):
+                    return True
+    return False
+
+
+def force_pushes_protected_branch(check: str) -> bool:
+    """git push with -f, --force, --force-with-lease, --force-if-includes, or a
+    +refspec, whose destination or lease ref is main or master."""
+    for segment in SEGMENT_SPLIT.split(check):
+        args = git_args(segment)
+        if not args or args[0] != "push":
+            continue
+        opts = [a for a in args[1:] if a.startswith("-")]
+        refspecs = [a for a in args[1:] if not a.startswith("-")][1:]
+        forced = any(
+            o in ("-f", "--force") or o.startswith(("--force-with-lease", "--force-if-includes")) for o in opts
+        )
+        if not (forced or any(s.startswith("+") for s in refspecs)):
+            continue
+        for o in opts:
+            if o.startswith("--force-with-lease=") and is_protected_ref(o.split("=", 1)[1].split(":", 1)[0]):
+                return True
+        for spec in refspecs:
+            if is_protected_ref(spec.split(":", 1)[1] if ":" in spec else spec):
+                return True
+    return False
+
 
 CATASTROPHIC_DELETE_PATTERNS = [
     re.compile(r"rm\s+-rf\s+/\s*($|[;&|])"),
@@ -119,14 +180,14 @@ def main() -> None:
 
     check = strip_quoted_strings(cmd)
 
-    if FORCE_PUSH.search(check) and MAIN_BRANCH_REF.search(check) and "ALLOW_FORCE_PUSH_MAIN" not in cmd:
+    if force_pushes_protected_branch(check) and "ALLOW_FORCE_PUSH_MAIN" not in cmd:
         block(
             "force-push to main/master is blocked by default. If the user has "
             "authorized this exact command, prefix it with ALLOW_FORCE_PUSH_MAIN=1 "
             "(add SKIP_ORIGIN_PUSH=1 for a push to origin)."
         )
 
-    if BRANCH_DELETE_MAIN.search(check):
+    if deletes_protected_branch(check):
         block("deleting the main/master branch is never allowed.")
 
     if origin_push_blocked() and ORIGIN_PUSH.search(check) and "SKIP_ORIGIN_PUSH" not in cmd:
