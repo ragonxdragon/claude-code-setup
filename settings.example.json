@@ -1,0 +1,139 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(~/.claude/.credentials.json)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.config/gh/hosts.yml)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/humanizer_editgate.py\"",
+            "statusMessage": "Humanizer gate: checking for dashes, curly quotes, emoji..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/destructive_command_guard.py\"",
+            "statusMessage": "Checking for destructive commands..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/test_output_filter.py\"",
+            "statusMessage": "Filtering test output..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/bare_commit_guard.py\"",
+            "statusMessage": "Checking git commit for an explicit pathspec..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/concurrent_reset_guard.py\"",
+            "statusMessage": "Checking git reset for a ref-moving target..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/post_format_reread_nudge.py\"",
+            "timeout": 10,
+            "statusMessage": "Checking whether a formatter rewrote the file..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/commit_cadence_nudge.py\"",
+            "timeout": 15,
+            "statusMessage": "Checking how much finished work is uncommitted..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/routing_rebuild.py\"",
+            "timeout": 30,
+            "statusMessage": "Rebuilding the routing table if knowledge changed..."
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/lint_and_skills.py\"",
+            "timeout": 30,
+            "statusMessage": "Linting the edited file..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/clean_boundary_nudge.py\"",
+            "statusMessage": "Checking for a clean boundary..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/secret_string_warn.py\"",
+            "timeout": 10,
+            "statusMessage": "Scanning the prompt for key-shaped strings..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/session_length_warn.py\"",
+            "statusMessage": "Checking session length..."
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/precompact_preserve.py\"",
+            "timeout": 10,
+            "statusMessage": "Adding compaction preservation instructions..."
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/notify_bell.py\"",
+            "timeout": 10,
+            "statusMessage": "Ringing the input-needed bell..."
+          }
+        ]
+      }
+    ]
+  }
+}
